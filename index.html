@@ -1279,5 +1279,15 @@
     loadData();
     state.timer = window.setInterval(loadData, CONFIG.refreshMs);
   </script>
+
+<script>
+  /*
+    recarrega a pagina a cada 60 segundos
+    pode pegar cache dependendo do navegador/github pages
+  */
+  setInterval(() => {
+    window.location.reload();
+  }, 60 * 1000);
+</script>
 </body>
 </html>
