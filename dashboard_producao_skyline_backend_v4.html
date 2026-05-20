@@ -1,0 +1,1099 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Produção | Skyline Mobile</title>
+  <style>
+    :root {
+      --bg-0: #090713;
+      --bg-1: #120a21;
+      --bg-2: #201035;
+      --purple: #9b5cff;
+      --purple-2: #b778ff;
+      --purple-3: #6d32d9;
+      --text: #f5f0ff;
+      --muted: #a99dbc;
+      --muted-2: #776b8a;
+      --danger: #ff5c9c;
+      --ok: #7dffca;
+      --warn: #ffd36e;
+      --glass: rgba(25, 13, 45, 0.58);
+      --glass-2: rgba(45, 21, 79, 0.46);
+      --border: rgba(178, 113, 255, 0.42);
+      --border-strong: rgba(195, 132, 255, 0.78);
+      --shadow: rgba(91, 39, 184, 0.46);
+      --radius: 24px;
+      --gap: 18px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--text);
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 20%, rgba(119, 55, 255, .34) 0, rgba(119, 55, 255, .12) 28%, transparent 58%),
+        radial-gradient(circle at 12% 58%, rgba(151, 82, 255, .18) 0, transparent 34%),
+        radial-gradient(circle at 88% 60%, rgba(108, 42, 205, .22) 0, transparent 34%),
+        linear-gradient(135deg, var(--bg-0) 0%, var(--bg-1) 44%, #0b0712 100%);
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::before {
+      opacity: .48;
+      background-image:
+        linear-gradient(90deg, rgba(154, 91, 255, .09) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(154, 91, 255, .06) 1px, transparent 1px),
+        radial-gradient(circle at 17% 14%, rgba(255,255,255,.30) 0 1px, transparent 2px),
+        radial-gradient(circle at 46% 8%, rgba(255,255,255,.22) 0 1px, transparent 2px),
+        radial-gradient(circle at 77% 20%, rgba(255,255,255,.17) 0 1px, transparent 2px),
+        radial-gradient(circle at 62% 80%, rgba(255,255,255,.22) 0 1px, transparent 2px);
+      background-size: 98px 98px, 98px 98px, 280px 280px, 340px 340px, 420px 420px, 500px 500px;
+      mask-image: radial-gradient(circle at center, #000 0%, #000 48%, transparent 92%);
+    }
+
+    body::after {
+      background:
+        linear-gradient(115deg, transparent 0 10%, rgba(126, 64, 255, .10) 10.2%, transparent 18%),
+        linear-gradient(35deg, transparent 0 76%, rgba(126, 64, 255, .08) 76.2%, transparent 86%);
+      opacity: .75;
+    }
+
+    .dashboard {
+      position: relative;
+      z-index: 1;
+      width: min(1820px, 100%);
+      height: 100vh;
+      margin: 0 auto;
+      padding: clamp(10px, 1.25vw, 20px);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: 220px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .brand-mark {
+      display: none;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(17px, 1.45vw, 24px);
+      line-height: 1.05;
+      letter-spacing: -.045em;
+      text-align: center;
+    }
+
+    .brand p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 9px;
+      text-align: center;
+    }
+
+    .actions {
+      display: none;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pill, button, input, select {
+      border: 1px solid rgba(178, 113, 255, .25);
+      background: rgba(27, 15, 49, .62);
+      color: var(--text);
+      border-radius: 999px;
+      min-height: 40px;
+      padding: 0 14px;
+      font: inherit;
+      outline: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    button {
+      cursor: pointer;
+      background: linear-gradient(135deg, rgba(155, 92, 255, .92), rgba(108, 50, 217, .76));
+      border-color: rgba(205, 158, 255, .50);
+      font-weight: 750;
+      transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+      box-shadow: 0 10px 28px rgba(115, 58, 230, .28);
+    }
+
+    input[type="url"] {
+      width: min(580px, 46vw);
+      border-radius: 14px;
+    }
+
+    .status-pill {
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .grid {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr;
+      grid-template-rows: minmax(118px, 18vh) minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .panel {
+      position: relative;
+      overflow: hidden;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(145deg, rgba(255,255,255,.11), transparent 16%),
+        linear-gradient(180deg, rgba(75, 35, 125, .44), rgba(18, 9, 34, .58)),
+        var(--glass);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.035) inset,
+        0 0 42px rgba(127, 60, 255, .12),
+        0 18px 60px rgba(0, 0, 0, .36);
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(194, 126, 255, .33), transparent 38%),
+        radial-gradient(circle at 0% 0%, rgba(255,255,255,.10), transparent 25%);
+      pointer-events: none;
+      opacity: .88;
+    }
+
+    .panel::after {
+      content: "";
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      top: -1px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(211, 158, 255, .90), transparent);
+      filter: blur(.2px);
+      opacity: .78;
+    }
+
+    .panel-content {
+      position: relative;
+      z-index: 1;
+      height: 100%;
+      padding: 14px 16px;
+    }
+
+    .kpi {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .kpi-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(155, 92, 255, .14);
+      border: 1px solid rgba(184, 120, 255, .18);
+      color: var(--purple-2);
+      font-size: 11px;
+    }
+
+    .kpi-value {
+      font-size: clamp(38px, 4vw, 62px);
+      line-height: .84;
+      letter-spacing: -.075em;
+      font-weight: 900;
+      text-shadow: 0 0 24px rgba(155, 92, 255, .28);
+    }
+
+    .kpi-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .delta {
+      color: var(--ok);
+      font-weight: 800;
+    }
+
+    .chart-panel { grid-column: 3; }
+    .table-panel { grid-column: 1 / -1; }
+
+    .panel-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .panel-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 850;
+      letter-spacing: -.02em;
+    }
+
+    .panel-subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .mini-legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--purple-2);
+      box-shadow: 0 0 14px rgba(183, 120, 255, .9);
+    }
+
+    .chart-wrap {
+      height: calc(100% - 36px);
+      min-height: 90px;
+    }
+
+    canvas { width: 100%; height: 100%; display: block; }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .table-toolbar input {
+      display: none;
+    }
+
+    .table-wrap {
+      height: calc(100% - 48px);
+      min-height: 0;
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(178, 113, 255, .16);
+      background: rgba(8, 5, 17, .20);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      text-align: left;
+      padding: 9px 10px;
+      background: rgba(20, 10, 36, .92);
+      color: #d9c9ff;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      border-bottom: 1px solid rgba(178, 113, 255, .18);
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid rgba(178, 113, 255, .08);
+      color: rgba(245, 240, 255, .90);
+      vertical-align: middle;
+    }
+
+    tbody tr:hover td {
+      background: rgba(155, 92, 255, .07);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 999px;
+      padding: 5px 9px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.055);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .status-badge.finalizado { color: var(--ok); border-color: rgba(125, 255, 202, .25); background: rgba(125, 255, 202, .08); }
+    .status-badge.em_execucao { color: var(--warn); border-color: rgba(255, 211, 110, .25); background: rgba(255, 211, 110, .08); }
+    .status-badge.outro { color: #d9c9ff; }
+
+    .empty, .error-box {
+      display: grid;
+      place-items: center;
+      height: 100%;
+      min-height: 120px;
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .error-box strong { color: var(--danger); }
+
+    .footer-note {
+      display: none;
+      margin-top: 0;
+      color: var(--muted-2);
+      font-size: 11px;
+      text-align: right;
+    }
+
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr 1fr; grid-template-rows: 220px 320px minmax(430px, auto); }
+      .chart-panel { grid-column: 1 / -1; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      input[type="url"] { width: min(100%, 720px); }
+      .actions { justify-content: flex-start; }
+    }
+
+    @media (max-width: 720px) {
+      .dashboard { padding: 14px; }
+      .grid { grid-template-columns: 1fr; grid-template-rows: 210px 210px 320px minmax(430px, auto); }
+      .chart-panel, .table-panel { grid-column: auto; }
+      .brand { min-width: 0; }
+      .actions, .table-toolbar { width: 100%; }
+      .actions > * { flex: 1 1 auto; }
+      input[type="url"], .table-toolbar input { width: 100%; }
+      .panel-content { padding: 18px; }
+      .kpi-value { font-size: 64px; }
+    }
+
+
+    /* versão compacta para caber em 16:9 sem rolagem */
+    .actions { display: none !important; }
+    .dashboard { overflow: hidden; }
+    .grid, .panel, .panel-content, .table-panel, .chart-panel { min-height: 0; }
+    .brand p { font-size: 11px; }
+    .panel-title { font-size: 13px; }
+    .panel-subtitle, .mini-legend, .kpi-footer { font-size: 10px; }
+    .kpi-label { font-size: 10px; }
+    table { font-size: 11px; }
+    thead th { font-size: 9px; padding: 8px 9px; }
+    tbody td { padding: 6px 9px; }
+    .status-badge { font-size: 10px; padding: 4px 7px; }
+    .table-toolbar { margin-bottom: 6px; }
+    .table-wrap { height: calc(100% - 42px); }
+    .footer-note, #loadStatus, #endpointInput, #dateMode, #refreshBtn, #searchInput { display: none !important; }
+  </style>
+</head>
+<body>
+  <main class="dashboard">
+    <header class="topbar">
+      <section class="brand" aria-label="Identidade do dashboard">
+        <div>
+          <h1>Produção Técnica</h1>
+          <p>monitoramento operacional em tempo real</p>
+        </div>
+      </section>
+
+      <section class="actions" aria-label="Controles do dashboard">
+        <input id="endpointInput" type="url" aria-label="Endpoint CSV" />
+        <select id="dateMode" aria-label="Filtro de data">
+          <option value="today" selected>somente hoje</option>
+          <option value="all">base inteira</option>
+        </select>
+        <button id="refreshBtn" type="button">atualizar</button>
+        <span id="loadStatus" class="pill status-pill">aguardando carga</span>
+      </section>
+    </header>
+
+    <section class="grid" aria-label="Visões do dashboard">
+      <article class="panel kpi-panel">
+        <div class="panel-content kpi">
+          <div class="kpi-header">
+            <span class="kpi-label">HUs em andamento</span>
+            <span class="kpi-icon">⚙</span>
+          </div>
+          <strong id="kpiRunning" class="kpi-value">--</strong>
+          <div class="kpi-footer">
+            <span>HUs distintas</span>
+            <span id="runningDelta" class="delta">tempo real</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel kpi-panel">
+        <div class="panel-content kpi">
+          <div class="kpi-header">
+            <span class="kpi-label">HUs finalizadas hoje</span>
+            <span class="kpi-icon">✓</span>
+          </div>
+          <strong id="kpiDone" class="kpi-value">--</strong>
+          <div class="kpi-footer">
+            <span>HUs distintas</span>
+            <span id="doneDelta" class="delta">produção</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel chart-panel">
+        <div class="panel-content">
+          <div class="panel-title-row">
+            <div>
+              <h2 class="panel-title">Produção hora a hora</h2>
+              <p class="panel-subtitle">HUs distintas finalizadas hoje por hora</p>
+            </div>
+            <div class="mini-legend">
+              <span class="legend-item"><span class="dot"></span> finalizados</span>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="hourChart" aria-label="Gráfico de produção por hora"></canvas>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel table-panel">
+        <div class="panel-content">
+          <div class="table-toolbar">
+            <div>
+              <h2 class="panel-title">Resumo por técnico</h2>
+              <p id="summaryText" class="panel-subtitle">carregando dados da operação</p>
+            </div>
+
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>usuário reparo</th>
+                  <th>HUs finalizadas hoje</th>
+                  <th>HUs em andamento hoje</th>
+                  <th>tempo médio finalização hoje</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <tr><td colspan="4"><div class="empty">buscando csv</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="footerNote" class="footer-note">auto refresh a cada 60 segundos</div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script>
+    /**
+     * Dashboard de produção Skyline Mobile.
+     * Backend/medidas ajustados para trabalhar com HU distinta.
+     *
+     * Regra principal:
+     * - a base bruta pode repetir a mesma HU em várias linhas por peça/produto;
+     * - por isso o dashboard cria primeiro uma camada resumida por HU;
+     * - cards, gráfico e tabela usam a camada resumida, evitando número inflado.
+     */
+
+    const CONFIG = {
+      endpoint: 'https://datalake.yardex.pro:10000/webhook/30e00080-9b5d-4db8-9d2a-e40d71b8cd5d',
+      refreshMs: 60_000,
+      statusRunning: 'em_execucao',
+      statusDone: 'finalizado',
+      timezoneOffsetHours: -3, // Converte datas ISO com Z de UTC para horário do Brasil.
+      columns: {
+        hu: ['data 2.hu', 'hu', 'HU'],
+        status: ['data 2.status', 'status'],
+        startedAt: ['data 2.Iniciado_Reparo', 'data 2.iniciado_reparo', 'Iniciado_Reparo', 'iniciado_reparo', 'inicio_reparo'],
+        endedAt: ['data 2.ended_at', 'ended_at', 'finalizado_em', 'data_finalizacao'],
+        technician: ['data 2.Usuário reparo', 'data 2.Usuario reparo', 'Usuário reparo', 'Usuario reparo', 'usuario reparo', 'usuario_reparo', 'tecnico', 'usuario']
+      }
+    };
+
+    const state = {
+      rows: [],
+      huRows: [],
+      tableRows: [],
+      lastLoadedAt: null,
+      timer: null
+    };
+
+    const el = {
+      endpointInput: document.getElementById('endpointInput'),
+      refreshBtn: document.getElementById('refreshBtn'),
+      loadStatus: document.getElementById('loadStatus'),
+      kpiRunning: document.getElementById('kpiRunning'),
+      kpiDone: document.getElementById('kpiDone'),
+      runningDelta: document.getElementById('runningDelta'),
+      doneDelta: document.getElementById('doneDelta'),
+      hourChart: document.getElementById('hourChart'),
+      summaryText: document.getElementById('summaryText'),
+      tableBody: document.getElementById('tableBody'),
+      searchInput: document.getElementById('searchInput'),
+      footerNote: document.getElementById('footerNote')
+    };
+
+    if (el.endpointInput) el.endpointInput.value = CONFIG.endpoint;
+
+    function normalizeText(value) {
+      return String(value ?? '')
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    }
+
+    function cleanHeader(header) {
+      return String(header ?? '').replace(/^\uFEFF/, '').trim();
+    }
+
+    function getColumn(row, aliases) {
+      for (const alias of aliases) {
+        if (Object.prototype.hasOwnProperty.call(row, alias)) return row[alias];
+      }
+
+      const keys = Object.keys(row);
+      const normalizedAliases = aliases.map(normalizeText);
+
+      for (const key of keys) {
+        const normalizedKey = normalizeText(key);
+        if (normalizedAliases.includes(normalizedKey)) return row[key];
+      }
+
+      return '';
+    }
+
+    function isBlank(value) {
+      const raw = String(value ?? '').trim();
+      return raw === '' || /^null$/i.test(raw) || /^undefined$/i.test(raw);
+    }
+
+    function csvToRows(csvText) {
+      const text = String(csvText ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+      if (!text) return [];
+
+      const delimiter = detectDelimiter(text);
+      const records = parseDelimited(text, delimiter);
+      if (records.length < 2) return [];
+
+      const headers = records[0].map(cleanHeader);
+      return records.slice(1)
+        .filter(record => record.some(cell => String(cell ?? '').trim() !== ''))
+        .map(record => {
+          const row = {};
+          headers.forEach((header, index) => { row[header] = record[index] ?? ''; });
+          return row;
+        });
+    }
+
+    function parsePayloadToRows(text) {
+      const raw = String(text ?? '').trim();
+      if (!raw) return [];
+
+      // Mantém compatibilidade caso o endpoint mude de CSV para JSON.
+      try {
+        const json = JSON.parse(raw);
+        if (Array.isArray(json)) return json;
+        if (Array.isArray(json.data)) return json.data;
+        if (Array.isArray(json['data 2'])) return json['data 2'];
+      } catch (_) {
+        // Se não for JSON válido, segue como CSV.
+      }
+
+      return csvToRows(raw);
+    }
+
+    function detectDelimiter(text) {
+      const firstLine = text.split('\n')[0] ?? '';
+      const candidates = [',', ';', '\t', '|'];
+      return candidates
+        .map(delimiter => ({ delimiter, count: firstLine.split(delimiter).length }))
+        .sort((a, b) => b.count - a.count)[0].delimiter;
+    }
+
+    function parseDelimited(text, delimiter) {
+      const rows = [];
+      let row = [];
+      let cell = '';
+      let insideQuotes = false;
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"' && insideQuotes && next === '"') {
+          cell += '"';
+          i++;
+          continue;
+        }
+
+        if (char === '"') {
+          insideQuotes = !insideQuotes;
+          continue;
+        }
+
+        if (char === delimiter && !insideQuotes) {
+          row.push(cell);
+          cell = '';
+          continue;
+        }
+
+        if (char === '\n' && !insideQuotes) {
+          row.push(cell);
+          rows.push(row);
+          row = [];
+          cell = '';
+          continue;
+        }
+
+        cell += char;
+      }
+
+      row.push(cell);
+      rows.push(row);
+      return rows;
+    }
+
+    function parseDateLoose(value) {
+      const raw = String(value ?? '').trim();
+      if (!raw || /^null$/i.test(raw)) return null;
+
+      const nativeDate = new Date(raw);
+      if (!Number.isNaN(nativeDate.getTime())) return nativeDate;
+
+      const brMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+      if (brMatch) {
+        const [, dd, mm, yyyy, hh = '0', min = '0', ss = '0'] = brMatch;
+        const fullYear = yyyy.length === 2 ? `20${yyyy}` : yyyy;
+        const date = new Date(Number(fullYear), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
+        if (!Number.isNaN(date.getTime())) return date;
+      }
+
+      if (/^\d{10,13}$/.test(raw)) {
+        const numeric = Number(raw);
+        const date = new Date(raw.length === 10 ? numeric * 1000 : numeric);
+        if (!Number.isNaN(date.getTime())) return date;
+      }
+
+      return null;
+    }
+
+    function toBrazilTime(date) {
+      if (!date) return null;
+      // Datas ISO com Z chegam em UTC. Esta cópia deslocada permite extrair dia/hora no horário BR.
+      return new Date(date.getTime() + CONFIG.timezoneOffsetHours * 60 * 60 * 1000);
+    }
+
+    function isTodayBr(date) {
+      if (!date) return false;
+      const brDate = toBrazilTime(date);
+      const brNow = toBrazilTime(new Date());
+      return brDate.getUTCFullYear() === brNow.getUTCFullYear()
+        && brDate.getUTCMonth() === brNow.getUTCMonth()
+        && brDate.getUTCDate() === brNow.getUTCDate();
+    }
+
+    function getHourBr(date) {
+      const brDate = toBrazilTime(date);
+      return brDate ? brDate.getUTCHours() : null;
+    }
+
+    function formatDuration(ms) {
+      if (!Number.isFinite(ms) || ms <= 0) return '-';
+      const totalMinutes = Math.round(ms / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      if (hours <= 0) return `${minutes}min`;
+      if (minutes === 0) return `${hours}h`;
+      return `${hours}h ${minutes}min`;
+    }
+
+    function formatFullDate(date) {
+      if (!date) return '-';
+      return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      }).format(date);
+    }
+
+    function getStatus(row) {
+      return normalizeText(getColumn(row, CONFIG.columns.status)).replace(/\s+/g, '_');
+    }
+
+    function getTechnician(row) {
+      return String(getColumn(row, CONFIG.columns.technician) || 'sem_usuario').trim() || 'sem_usuario';
+    }
+
+    function buildHuSummary(rows) {
+      const map = new Map();
+
+      rows.forEach(row => {
+        const hu = String(getColumn(row, CONFIG.columns.hu) || '').trim();
+        if (!hu) return;
+
+        const status = getStatus(row);
+        const startedAt = parseDateLoose(getColumn(row, CONFIG.columns.startedAt));
+        const endedRaw = getColumn(row, CONFIG.columns.endedAt);
+        const endedAt = isBlank(endedRaw) ? null : parseDateLoose(endedRaw);
+        const technician = getTechnician(row);
+
+        if (!map.has(hu)) {
+          map.set(hu, {
+            hu,
+            technician,
+            statusFinal: status,
+            inicio: startedAt,
+            fim: endedAt,
+            hasRunningOpen: status === CONFIG.statusRunning && !endedAt,
+            hasDoneClosed: status === CONFIG.statusDone && !!endedAt,
+            lastMovement: endedAt || startedAt || null
+          });
+        }
+
+        const item = map.get(hu);
+
+        if (startedAt && (!item.inicio || startedAt < item.inicio)) item.inicio = startedAt;
+        if (endedAt && (!item.fim || endedAt > item.fim)) item.fim = endedAt;
+
+        if (status === CONFIG.statusRunning && !endedAt) item.hasRunningOpen = true;
+        if (status === CONFIG.statusDone && endedAt) item.hasDoneClosed = true;
+
+        const movementDate = endedAt || startedAt;
+        if (movementDate && (!item.lastMovement || movementDate > item.lastMovement)) {
+          item.lastMovement = movementDate;
+          item.statusFinal = status;
+          item.technician = technician;
+        }
+      });
+
+      return Array.from(map.values()).map(item => {
+        let statusFinal = item.statusFinal;
+
+        // Prioridade segura: HU finalizada fechada ganha de linhas antigas em execução.
+        if (item.hasDoneClosed) statusFinal = CONFIG.statusDone;
+        else if (item.hasRunningOpen) statusFinal = CONFIG.statusRunning;
+
+        return {
+          ...item,
+          statusFinal,
+          tempoFinalizacao: item.hasDoneClosed && item.inicio && item.fim ? item.fim - item.inicio : null
+        };
+      });
+    }
+
+    async function loadData() {
+      const endpoint = el.endpointInput?.value?.trim() || CONFIG.endpoint;
+      const requestUrl = endpoint.includes('?')
+        ? `${endpoint}&_dash_refresh=${Date.now()}`
+        : `${endpoint}?_dash_refresh=${Date.now()}`;
+      setLoading('buscando base');
+
+      try {
+        // cache: no-store + parâmetro variável garantem nova consulta no endpoint
+        // a cada carga automática, sem reaproveitar resposta antiga do navegador.
+        const response = await fetch(requestUrl, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const text = await response.text();
+        const rows = parsePayloadToRows(text);
+        if (!rows.length) throw new Error('base vazia ou formato não reconhecido');
+
+        state.rows = rows;
+        state.huRows = buildHuSummary(rows);
+        state.lastLoadedAt = new Date();
+        render();
+        setLoading(`${rows.length} linhas · ${state.huRows.length} HUs distintas`);
+      } catch (error) {
+        console.error(error);
+        renderError(error);
+        setLoading('erro na carga');
+      }
+    }
+
+    function setLoading(message) {
+      if (el.loadStatus) el.loadStatus.textContent = message;
+      if (el.footerNote) {
+        el.footerNote.textContent = state.lastLoadedAt
+          ? `última atualização: ${formatFullDate(state.lastLoadedAt)} · auto refresh a cada 60 segundos`
+          : 'auto refresh a cada 60 segundos';
+      }
+    }
+
+    function render() {
+      renderKpis(state.huRows);
+      renderChart(state.huRows);
+      buildTableRows(state.huRows);
+      renderTable();
+    }
+
+    function renderKpis(huRows) {
+      const runningToday = huRows.filter(isRunningToday).length;
+      const doneToday = huRows.filter(isDoneToday).length;
+      const todayTotal = huRows.filter(item => isRunningToday(item) || isDoneToday(item)).length;
+
+      el.kpiRunning.textContent = String(runningToday);
+      el.kpiDone.textContent = String(doneToday);
+      el.runningDelta.textContent = todayTotal ? `${runningToday} abertas hoje` : 'sem dados hoje';
+      el.doneDelta.textContent = `${doneToday} hoje`;
+      el.summaryText.textContent = `${todayTotal} HUs distintas hoje · ${doneToday} finalizadas · ${runningToday} em andamento`;
+    }
+
+    function renderChart(huRows) {
+      const counts = Array.from({ length: 24 }, () => 0);
+
+      huRows.forEach(item => {
+        if (!isDoneToday(item)) return;
+        const hour = getHourBr(item.fim);
+        if (hour !== null && hour >= 0 && hour <= 23) counts[hour]++;
+      });
+
+      drawLineChart(el.hourChart, counts);
+    }
+
+    function drawLineChart(canvas, values) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const padding = { top: 16, right: 18, bottom: 30, left: 38 };
+      const width = rect.width - padding.left - padding.right;
+      const height = rect.height - padding.top - padding.bottom;
+      const maxValue = Math.max(1, ...values);
+
+      ctx.font = '11px Inter, system-ui, sans-serif';
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(217, 201, 255, .13)';
+      ctx.fillStyle = 'rgba(217, 201, 255, .56)';
+
+      for (let i = 0; i <= 4; i++) {
+        const y = padding.top + height - (height * i / 4);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(padding.left + width, y);
+        ctx.stroke();
+        ctx.fillText(String(Math.round(maxValue * i / 4)), 8, y + 4);
+      }
+
+      const points = values.map((value, hour) => {
+        const x = padding.left + (width * hour / 23);
+        const y = padding.top + height - (height * value / maxValue);
+        return { x, y, value, hour };
+      });
+
+      const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + height);
+      gradient.addColorStop(0, 'rgba(183, 120, 255, .34)');
+      gradient.addColorStop(1, 'rgba(183, 120, 255, 0)');
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.lineTo(padding.left + width, padding.top + height);
+      ctx.lineTo(padding.left, padding.top + height);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      const lineGradient = ctx.createLinearGradient(padding.left, 0, padding.left + width, 0);
+      lineGradient.addColorStop(0, '#b778ff');
+      lineGradient.addColorStop(.5, '#ffffff');
+      lineGradient.addColorStop(1, '#9b5cff');
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.strokeStyle = lineGradient;
+      ctx.lineWidth = 3;
+      ctx.shadowColor = 'rgba(183, 120, 255, .7)';
+      ctx.shadowBlur = 14;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = '#d7bbff';
+      points.forEach(point => {
+        if (!point.value) return;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = 'rgba(217, 201, 255, .50)';
+      [0, 6, 12, 18, 23].forEach(hour => {
+        const x = padding.left + (width * hour / 23);
+        ctx.fillText(`${String(hour).padStart(2, '0')}h`, x - 12, rect.height - 8);
+      });
+    }
+
+    function buildTableRows(huRows) {
+      const map = new Map();
+
+      huRows.forEach(item => {
+        const technician = item.technician || 'sem_usuario';
+
+        if (!map.has(technician)) {
+          map.set(technician, {
+            technician,
+            done: 0,
+            running: 0,
+            totalDuration: 0,
+            durationCount: 0
+          });
+        }
+
+        const group = map.get(technician);
+
+        if (isDoneToday(item)) {
+          group.done += 1;
+
+          if (Number.isFinite(item.tempoFinalizacao) && item.tempoFinalizacao > 0) {
+            group.totalDuration += item.tempoFinalizacao;
+            group.durationCount += 1;
+          }
+        }
+
+        if (isRunningToday(item)) {
+          group.running += 1;
+        }
+      });
+
+      state.tableRows = Array.from(map.values())
+        .map(item => ({
+          ...item,
+          avgDuration: item.durationCount ? item.totalDuration / item.durationCount : null
+        }))
+        .sort((a, b) => b.done - a.done || b.running - a.running || a.technician.localeCompare(b.technician, 'pt-BR'));
+    }
+
+    function renderTable() {
+      const query = normalizeText(el.searchInput?.value || '');
+      const rows = state.tableRows.filter(item => !query || normalizeText(item.technician).includes(query));
+
+      if (!rows.length) {
+        el.tableBody.innerHTML = '<tr><td colspan="4"><div class="empty">nenhum registro encontrado</div></td></tr>';
+        return;
+      }
+
+      el.tableBody.innerHTML = rows.map(item => `
+        <tr>
+          <td><strong>${escapeHtml(item.technician)}</strong></td>
+          <td><strong>${item.done}</strong></td>
+          <td><strong>${item.running}</strong></td>
+          <td>${escapeHtml(formatDuration(item.avgDuration))}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderError(error) {
+      el.kpiRunning.textContent = '--';
+      el.kpiDone.textContent = '--';
+      el.runningDelta.textContent = 'sem carga';
+      el.doneDelta.textContent = 'sem carga';
+      el.summaryText.textContent = 'falha ao carregar a base';
+      el.tableBody.innerHTML = '<tr><td colspan="4"><div class="empty">sem dados carregados</div></td></tr>';
+      drawLineChart(el.hourChart, Array.from({ length: 24 }, () => 0));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    el.refreshBtn?.addEventListener('click', loadData);
+    el.searchInput?.addEventListener('input', renderTable);
+    window.addEventListener('resize', () => renderChart(state.huRows));
+
+    loadData();
+    state.timer = window.setInterval(loadData, CONFIG.refreshMs);
+  </script>
+</body>
+</html>
