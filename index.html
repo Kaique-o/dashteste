@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Dashboard Produção | Skyline Mobile</title>
   <style>
     :root {
@@ -537,7 +540,7 @@
           <div class="table-toolbar">
             <div>
               <h2 class="panel-title">Aparelhos em reparo</h2>
-              <p id="summaryText" class="panel-subtitle">IMEI, descrição, tempo de reparo e status</p>
+              <p id="summaryText" class="panel-subtitle">IMEI, descrição e status somente de hoje</p>
             </div>
 
           </div>
@@ -547,16 +550,15 @@
                 <tr>
                   <th>imei</th>
                   <th>descrição</th>
-                  <th>tempo de reparo</th>
                   <th>status</th>
                 </tr>
               </thead>
               <tbody id="tableBody">
-                <tr><td colspan="4"><div class="empty">buscando csv</div></td></tr>
+                <tr><td colspan="3"><div class="empty">buscando csv</div></td></tr>
               </tbody>
             </table>
           </div>
-          <div id="footerNote" class="footer-note">auto refresh a cada 5 segundos</div>
+          <div id="footerNote" class="footer-note">auto refresh a cada 15 segundos</div>
         </div>
       </article>
     </section>
@@ -575,7 +577,7 @@
 
     const CONFIG = {
       endpoint: 'https://datalake.yardex.pro:10000/webhook/30e00080-9b5d-4db8-9d2a-e40d71b8cd5d',
-      refreshMs: 5_000,
+      refreshMs: 15_000,
       statusRunning: 'em_execucao',
       statusDone: 'finalizado',
       timezoneOffsetHours: -3, // Converte datas ISO com Z de UTC para horário do Brasil.
@@ -1094,8 +1096,8 @@
       if (el.loadStatus) el.loadStatus.textContent = message;
       if (el.footerNote) {
         el.footerNote.textContent = state.lastLoadedAt
-          ? `última atualização: ${formatFullDate(state.lastLoadedAt)} · auto refresh a cada 5 segundos`
-          : 'auto refresh a cada 5 segundos';
+          ? `última atualização: ${formatFullDate(state.lastLoadedAt)} · auto refresh a cada 15 segundos`
+          : 'auto refresh a cada 15 segundos';
       }
     }
 
@@ -1229,12 +1231,15 @@
 
     function buildTableRows(huRows) {
       // Uma linha por HU para não duplicar aparelho por peça/produto requisitado.
+      // A lista tambem respeita o filtro de hoje:
+      // - finalizado: usa ended_at de hoje;
+      // - em andamento: usa iniciado_reparo de hoje e ended_at vazio.
+      // Isso evita listar aparelhos antigos aguardando inicio ou reparos de dias anteriores.
       state.tableRows = huRows
-        .filter(item => item && (isDoneToday(item) || item.statusFinal !== CONFIG.statusDone))
+        .filter(item => item && (isDoneToday(item) || isRunningToday(item)))
         .map(item => ({
           imei: item.serial || item.hu || '-',
           description: item.description || '-',
-          repairDuration: getRepairDuration(item),
           statusLabel: getDisplayStatus(item),
           sortDate: item.fim || item.inicio || item.lastMovement || new Date(0)
         }))
@@ -1251,7 +1256,7 @@
       });
 
       if (!rows.length) {
-        el.tableBody.innerHTML = '<tr><td colspan="4"><div class="empty">nenhum registro encontrado</div></td></tr>';
+        el.tableBody.innerHTML = '<tr><td colspan="3"><div class="empty">nenhum registro encontrado</div></td></tr>';
         return;
       }
 
@@ -1259,7 +1264,6 @@
         <tr>
           <td><strong>${escapeHtml(item.imei)}</strong></td>
           <td>${escapeHtml(item.description)}</td>
-          <td>${escapeHtml(formatDuration(item.repairDuration))}</td>
           <td><strong>${escapeHtml(item.statusLabel)}</strong></td>
         </tr>
       `).join('');
@@ -1271,7 +1275,7 @@
       el.runningDelta.textContent = 'sem carga';
       el.doneDelta.textContent = 'sem carga';
       el.summaryText.textContent = 'falha ao carregar a base';
-      el.tableBody.innerHTML = '<tr><td colspan="4"><div class="empty">sem dados carregados</div></td></tr>';
+      el.tableBody.innerHTML = '<tr><td colspan="3"><div class="empty">sem dados carregados</div></td></tr>';
       drawLineChart(el.hourChart, Array.from({ length: 24 }, () => 0));
     }
 
@@ -1294,12 +1298,41 @@
 
 <script>
   /*
-    recarrega a pagina a cada 5 segundos
-    pode pegar cache dependendo do navegador/github pages
+    reload agressivo a cada 15 segundos
+
+    por que assim:
+    - troca um parametro na url para quebrar cache do github pages/navegador;
+    - usa location.replace para nao lotar o historico;
+    - tenta limpar Cache Storage quando existir;
+    - tenta derrubar service workers que possam segurar arquivo antigo;
+    - se algo falhar, cai no reload normal.
   */
-  setInterval(() => {
-    window.location.reload();
-  }, 5 * 1000);
+  async function forceAggressiveReload() {
+    try {
+      // limpa cache storage criado por navegador/app/pwa, quando existir
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
+      }
+
+      // remove service workers que possam manter html/js antigo em cache
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(registration => registration.unregister()));
+      }
+
+      // muda a url a cada ciclo para forcar uma nova requisicao do index/html
+      const url = new URL(window.location.href);
+      url.searchParams.set('_force_reload', String(Date.now()));
+
+      window.location.replace(url.toString());
+    } catch (error) {
+      console.warn('reload agressivo falhou, usando reload normal', error);
+      window.location.reload();
+    }
+  }
+
+  setInterval(forceAggressiveReload, 15 * 1000);
 </script>
 </body>
 </html>
