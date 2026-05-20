@@ -664,21 +664,181 @@
         });
     }
 
+    function normalizeRecordKeys(row) {
+      // Mantém chaves originais, mas também cria versões normalizadas.
+      // Isso protege o dashboard contra variações tipo:
+      // "Usuário reparo", "usuario reparo", "data 2.Usuario reparo" etc.
+      if (!row || typeof row !== 'object' || Array.isArray(row)) return row;
+
+      const normalized = { ...row };
+      Object.entries(row).forEach(([key, value]) => {
+        const cleanKey = cleanHeader(key);
+        const noPrefixKey = cleanKey.replace(/^data\s*2\./i, '').trim();
+
+        if (!(cleanKey in normalized)) normalized[cleanKey] = value;
+        if (!(noPrefixKey in normalized)) normalized[noPrefixKey] = value;
+        if (!(normalizeText(cleanKey) in normalized)) normalized[normalizeText(cleanKey)] = value;
+        if (!(normalizeText(noPrefixKey) in normalized)) normalized[normalizeText(noPrefixKey)] = value;
+      });
+
+      return normalized;
+    }
+
+    function normalizeRows(rows) {
+      return (Array.isArray(rows) ? rows : [])
+        .filter(row => row && typeof row === 'object' && !Array.isArray(row))
+        .map(normalizeRecordKeys);
+    }
+
+    function findLargestObjectArray(value) {
+      // Procura recursivamente o maior array de objetos dentro de qualquer JSON.
+      // Isso cobre retornos como:
+      // { "data 2": [...] }
+      // [{ "data 2": [...] }]
+      // { data: { "data 2": [...] } }
+      const candidates = [];
+      const visited = new Set();
+
+      function walk(node) {
+        if (!node || typeof node !== 'object') return;
+        if (visited.has(node)) return;
+        visited.add(node);
+
+        if (Array.isArray(node)) {
+          if (node.some(item => item && typeof item === 'object' && !Array.isArray(item))) {
+            candidates.push(node);
+          }
+          node.forEach(walk);
+          return;
+        }
+
+        Object.values(node).forEach(walk);
+      }
+
+      walk(value);
+      return candidates
+        .sort((a, b) => b.length - a.length)[0] || [];
+    }
+
+    function parseInspectorDumpToRows(text) {
+      // Parser para o novo formato colado/exportado do endpoint:
+      // data 2
+      // [0…99]
+      // 0
+      // id\t"2"
+      // Usuário reparo\t671
+      // hu\t"606761"
+      // ...
+      const lines = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      const rows = [];
+      let current = null;
+
+      function commitCurrent() {
+        if (current && Object.keys(current).length) rows.push(normalizeRecordKeys(current));
+        current = null;
+      }
+
+      function parseDumpValue(rawValue) {
+        const raw = String(rawValue ?? '').trim();
+        if (raw === '' || /^null$/i.test(raw)) return null;
+        if (/^undefined$/i.test(raw)) return '';
+
+        if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+          try { return JSON.parse(raw); } catch (_) { return raw.slice(1, -1); }
+        }
+
+        if (/^-?\d+(?:\.\d+)?$/.test(raw)) {
+          const numberValue = Number(raw);
+          if (Number.isFinite(numberValue)) return numberValue;
+        }
+
+        return raw;
+      }
+
+      for (const rawLine of lines) {
+        const line = String(rawLine ?? '').trim();
+        if (!line) continue;
+
+        // Ignora marcadores visuais do inspetor: data 2, [0…99], [100…199]
+        if (/^data\s*2$/i.test(line)) continue;
+        if (/^\[\d+\s*[…\.]{1,3}\s*\d+\]$/.test(line)) continue;
+
+        // Linha só com índice inicia um novo registro.
+        if (/^\d+$/.test(line)) {
+          commitCurrent();
+          current = {};
+          continue;
+        }
+
+        // Pega pares chave/valor separados por tab. Se não tiver tab, tenta 2+ espaços.
+        let separatorIndex = rawLine.indexOf('\t');
+        let key;
+        let value;
+
+        if (separatorIndex >= 0) {
+          key = rawLine.slice(0, separatorIndex).trim();
+          value = rawLine.slice(separatorIndex + 1).trim();
+        } else {
+          const match = rawLine.match(/^\s*([^\t]+?)\s{2,}(.+)\s*$/);
+          if (!match) continue;
+          key = match[1].trim();
+          value = match[2].trim();
+        }
+
+        if (!key) continue;
+        if (!current) current = {};
+        current[cleanHeader(key)] = parseDumpValue(value);
+      }
+
+      commitCurrent();
+      return rows;
+    }
+
     function parsePayloadToRows(text) {
       const raw = String(text ?? '').trim();
       if (!raw) return [];
 
-      // Mantém compatibilidade caso o endpoint mude de CSV para JSON.
+      // Formato principal esperado agora: JSON com chave "data 2" contendo a lista.
+      // Também cobre array puro, { data: [...] }, [{ "data 2": [...] }] e aninhamentos.
       try {
         const json = JSON.parse(raw);
-        if (Array.isArray(json)) return json;
-        if (Array.isArray(json.data)) return json.data;
-        if (Array.isArray(json['data 2'])) return json['data 2'];
+
+        if (Array.isArray(json)) {
+          const directRows = normalizeRows(json);
+          if (directRows.length) return directRows;
+
+          const nestedRows = normalizeRows(findLargestObjectArray(json));
+          if (nestedRows.length) return nestedRows;
+        }
+
+        if (json && typeof json === 'object') {
+          const knownArrays = [
+            json['data 2'],
+            json.data,
+            json.rows,
+            json.items,
+            json.result,
+            json.results
+          ];
+
+          for (const candidate of knownArrays) {
+            const rows = normalizeRows(candidate);
+            if (rows.length) return rows;
+          }
+
+          const nestedRows = normalizeRows(findLargestObjectArray(json));
+          if (nestedRows.length) return nestedRows;
+        }
       } catch (_) {
-        // Se não for JSON válido, segue como CSV.
+        // Se não for JSON válido, tenta os formatos textuais abaixo.
       }
 
-      return csvToRows(raw);
+      // Cobre o formato de dump do inspetor mostrado no arquivo enviado.
+      const dumpRows = parseInspectorDumpToRows(raw);
+      if (dumpRows.length) return dumpRows;
+
+      // Fallback para CSV/TSV antigo.
+      return normalizeRows(csvToRows(raw));
     }
 
     function detectDelimiter(text) {
@@ -857,6 +1017,30 @@
           tempoFinalizacao: item.hasDoneClosed && item.inicio && item.fim ? item.fim - item.inicio : null
         };
       });
+    }
+
+
+
+    function isRunningToday(item) {
+      // Conta HU distinta em andamento somente quando existe linha aberta:
+      // status = em_execucao + ended_at vazio.
+      // Usa a menor data de inicio da HU para aplicar o filtro de hoje no horário BR.
+      // Se a HU também já tem finalização fechada, ela deixa de ser tratada como aberta.
+      return !!item
+        && item.hasRunningOpen === true
+        && item.hasDoneClosed !== true
+        && !!item.inicio
+        && isTodayBr(item.inicio);
+    }
+
+    function isDoneToday(item) {
+      // Conta HU distinta finalizada somente quando existe finalização fechada:
+      // status = finalizado + ended_at preenchido.
+      // Usa o maior ended_at da HU para aplicar o filtro de hoje no horário BR.
+      return !!item
+        && item.hasDoneClosed === true
+        && !!item.fim
+        && isTodayBr(item.fim);
     }
 
     async function loadData() {
