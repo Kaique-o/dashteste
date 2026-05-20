@@ -536,8 +536,8 @@
         <div class="panel-content">
           <div class="table-toolbar">
             <div>
-              <h2 class="panel-title">Resumo por técnico</h2>
-              <p id="summaryText" class="panel-subtitle">carregando dados da operação</p>
+              <h2 class="panel-title">Aparelhos em reparo</h2>
+              <p id="summaryText" class="panel-subtitle">IMEI, descrição, tempo de reparo e status</p>
             </div>
 
           </div>
@@ -545,10 +545,10 @@
             <table>
               <thead>
                 <tr>
-                  <th>usuário reparo</th>
-                  <th>HUs finalizadas hoje</th>
-                  <th>HUs em andamento hoje</th>
-                  <th>tempo médio finalização hoje</th>
+                  <th>imei</th>
+                  <th>descrição</th>
+                  <th>tempo de reparo</th>
+                  <th>status</th>
                 </tr>
               </thead>
               <tbody id="tableBody">
@@ -556,7 +556,7 @@
               </tbody>
             </table>
           </div>
-          <div id="footerNote" class="footer-note">auto refresh a cada 60 segundos</div>
+          <div id="footerNote" class="footer-note">auto refresh a cada 5 segundos</div>
         </div>
       </article>
     </section>
@@ -575,16 +575,18 @@
 
     const CONFIG = {
       endpoint: 'https://datalake.yardex.pro:10000/webhook/30e00080-9b5d-4db8-9d2a-e40d71b8cd5d',
-      refreshMs: 60_000,
+      refreshMs: 5_000,
       statusRunning: 'em_execucao',
       statusDone: 'finalizado',
       timezoneOffsetHours: -3, // Converte datas ISO com Z de UTC para horário do Brasil.
       columns: {
-        hu: ['data 2.hu', 'hu', 'HU'],
-        status: ['data 2.status', 'status'],
-        startedAt: ['data 2.Iniciado_Reparo', 'data 2.iniciado_reparo', 'Iniciado_Reparo', 'iniciado_reparo', 'inicio_reparo'],
-        endedAt: ['data 2.ended_at', 'ended_at', 'finalizado_em', 'data_finalizacao'],
-        technician: ['data 2.Usuário reparo', 'data 2.Usuario reparo', 'Usuário reparo', 'Usuario reparo', 'usuario reparo', 'usuario_reparo', 'tecnico', 'usuario']
+        hu: ['data 1.hu', 'data 2.hu', 'hu', 'HU'],
+        status: ['data 1.status', 'data 2.status', 'status'],
+        startedAt: ['data 1.Iniciado_Reparo', 'data 1.iniciado_reparo', 'data 2.Iniciado_Reparo', 'data 2.iniciado_reparo', 'Iniciado_Reparo', 'iniciado_reparo', 'inicio_reparo'],
+        endedAt: ['data 1.ended_at', 'data 2.ended_at', 'ended_at', 'finalizado_em', 'data_finalizacao'],
+        technician: ['data 1.Usuário reparo', 'data 1.Usuario reparo', 'data 2.Usuário reparo', 'data 2.Usuario reparo', 'Usuário reparo', 'Usuario reparo', 'usuario reparo', 'usuario_reparo', 'tecnico', 'usuario'],
+        serial: ['data 1.serial', 'data 2.serial', 'serial', 'imei', 'IMEI'],
+        description: ['data 1.descricao', 'data 2.descricao', 'descricao', 'descrição', 'descricao_produto', 'produto_descricao']
       }
     };
 
@@ -673,7 +675,7 @@
       const normalized = { ...row };
       Object.entries(row).forEach(([key, value]) => {
         const cleanKey = cleanHeader(key);
-        const noPrefixKey = cleanKey.replace(/^data\s*2\./i, '').trim();
+        const noPrefixKey = cleanKey.replace(/^data\s*[12]\./i, '').trim();
 
         if (!(cleanKey in normalized)) normalized[cleanKey] = value;
         if (!(noPrefixKey in normalized)) normalized[noPrefixKey] = value;
@@ -962,6 +964,14 @@
       return String(getColumn(row, CONFIG.columns.technician) || 'sem_usuario').trim() || 'sem_usuario';
     }
 
+    function getSerial(row) {
+      return String(getColumn(row, CONFIG.columns.serial) || '').trim();
+    }
+
+    function getDescription(row) {
+      return String(getColumn(row, CONFIG.columns.description) || '').trim();
+    }
+
     function buildHuSummary(rows) {
       const map = new Map();
 
@@ -974,11 +984,15 @@
         const endedRaw = getColumn(row, CONFIG.columns.endedAt);
         const endedAt = isBlank(endedRaw) ? null : parseDateLoose(endedRaw);
         const technician = getTechnician(row);
+        const serial = getSerial(row);
+        const description = getDescription(row);
 
         if (!map.has(hu)) {
           map.set(hu, {
             hu,
             technician,
+            serial,
+            description,
             statusFinal: status,
             inicio: startedAt,
             fim: endedAt,
@@ -989,6 +1003,10 @@
         }
 
         const item = map.get(hu);
+
+        // Usa o primeiro valor válido encontrado, mas atualiza quando uma linha mais completa trouxer descrição/serial.
+        if (serial && (!item.serial || item.serial === '-')) item.serial = serial;
+        if (description && (!item.description || item.description === '-')) item.description = description;
 
         if (startedAt && (!item.inicio || startedAt < item.inicio)) item.inicio = startedAt;
         if (endedAt && (!item.fim || endedAt > item.fim)) item.fim = endedAt;
@@ -1076,15 +1094,15 @@
       if (el.loadStatus) el.loadStatus.textContent = message;
       if (el.footerNote) {
         el.footerNote.textContent = state.lastLoadedAt
-          ? `última atualização: ${formatFullDate(state.lastLoadedAt)} · auto refresh a cada 60 segundos`
-          : 'auto refresh a cada 60 segundos';
+          ? `última atualização: ${formatFullDate(state.lastLoadedAt)} · auto refresh a cada 5 segundos`
+          : 'auto refresh a cada 5 segundos';
       }
     }
 
     function render() {
+      buildTableRows(state.huRows);
       renderKpis(state.huRows);
       renderChart(state.huRows);
-      buildTableRows(state.huRows);
       renderTable();
     }
 
@@ -1097,7 +1115,7 @@
       el.kpiDone.textContent = String(doneToday);
       el.runningDelta.textContent = todayTotal ? `${runningToday} abertas hoje` : 'sem dados hoje';
       el.doneDelta.textContent = `${doneToday} hoje`;
-      el.summaryText.textContent = `${todayTotal} HUs distintas hoje · ${doneToday} finalizadas · ${runningToday} em andamento`;
+      el.summaryText.textContent = `${state.tableRows.length} aparelhos listados · ${doneToday} finalizados hoje · ${runningToday} em andamento hoje`;
     }
 
     function renderChart(huRows) {
@@ -1194,49 +1212,43 @@
       });
     }
 
+    function getRepairDuration(item) {
+      // Finalizado: fim - início.
+      // Em andamento: agora - início.
+      // Sem início preenchido: não dá para calcular com segurança.
+      if (!item || !item.inicio) return null;
+      if (item.statusFinal === CONFIG.statusDone && item.fim) return item.fim - item.inicio;
+      if (item.statusFinal !== CONFIG.statusDone) return new Date() - item.inicio;
+      return null;
+    }
+
+    function getDisplayStatus(item) {
+      // A tabela final mostra somente dois estados visuais: finalizado ou em andamento.
+      return item?.statusFinal === CONFIG.statusDone ? 'finalizado' : 'em andamento';
+    }
+
     function buildTableRows(huRows) {
-      const map = new Map();
-
-      huRows.forEach(item => {
-        const technician = item.technician || 'sem_usuario';
-
-        if (!map.has(technician)) {
-          map.set(technician, {
-            technician,
-            done: 0,
-            running: 0,
-            totalDuration: 0,
-            durationCount: 0
-          });
-        }
-
-        const group = map.get(technician);
-
-        if (isDoneToday(item)) {
-          group.done += 1;
-
-          if (Number.isFinite(item.tempoFinalizacao) && item.tempoFinalizacao > 0) {
-            group.totalDuration += item.tempoFinalizacao;
-            group.durationCount += 1;
-          }
-        }
-
-        if (isRunningToday(item)) {
-          group.running += 1;
-        }
-      });
-
-      state.tableRows = Array.from(map.values())
+      // Uma linha por HU para não duplicar aparelho por peça/produto requisitado.
+      state.tableRows = huRows
+        .filter(item => item && (isDoneToday(item) || item.statusFinal !== CONFIG.statusDone))
         .map(item => ({
-          ...item,
-          avgDuration: item.durationCount ? item.totalDuration / item.durationCount : null
+          imei: item.serial || item.hu || '-',
+          description: item.description || '-',
+          repairDuration: getRepairDuration(item),
+          statusLabel: getDisplayStatus(item),
+          sortDate: item.fim || item.inicio || item.lastMovement || new Date(0)
         }))
-        .sort((a, b) => b.done - a.done || b.running - a.running || a.technician.localeCompare(b.technician, 'pt-BR'));
+        .sort((a, b) => b.sortDate - a.sortDate || a.description.localeCompare(b.description, 'pt-BR'));
     }
 
     function renderTable() {
       const query = normalizeText(el.searchInput?.value || '');
-      const rows = state.tableRows.filter(item => !query || normalizeText(item.technician).includes(query));
+      const rows = state.tableRows.filter(item => {
+        if (!query) return true;
+        return normalizeText(item.imei).includes(query)
+          || normalizeText(item.description).includes(query)
+          || normalizeText(item.statusLabel).includes(query);
+      });
 
       if (!rows.length) {
         el.tableBody.innerHTML = '<tr><td colspan="4"><div class="empty">nenhum registro encontrado</div></td></tr>';
@@ -1245,10 +1257,10 @@
 
       el.tableBody.innerHTML = rows.map(item => `
         <tr>
-          <td><strong>${escapeHtml(item.technician)}</strong></td>
-          <td><strong>${item.done}</strong></td>
-          <td><strong>${item.running}</strong></td>
-          <td>${escapeHtml(formatDuration(item.avgDuration))}</td>
+          <td><strong>${escapeHtml(item.imei)}</strong></td>
+          <td>${escapeHtml(item.description)}</td>
+          <td>${escapeHtml(formatDuration(item.repairDuration))}</td>
+          <td><strong>${escapeHtml(item.statusLabel)}</strong></td>
         </tr>
       `).join('');
     }
@@ -1282,12 +1294,12 @@
 
 <script>
   /*
-    recarrega a pagina a cada 60 segundos
+    recarrega a pagina a cada 5 segundos
     pode pegar cache dependendo do navegador/github pages
   */
   setInterval(() => {
     window.location.reload();
-  }, 60 * 1000);
+  }, 5 * 1000);
 </script>
 </body>
 </html>
